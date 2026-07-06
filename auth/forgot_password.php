@@ -8,26 +8,29 @@ if (isset($_SESSION['user_id'])) {
 }
 
 $error = '';
+$success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $email = trim($_POST['email']);
-    $password = $_POST['password'];
 
-    if (empty($email) || empty($password)) {
-        $error = 'Please enter both email and password.';
+    if (empty($email)) {
+        $error = 'Please enter your email address.';
     } else {
-        $stmt = $pdo->prepare("SELECT * FROM users WHERE email = ?");
+        $stmt = $pdo->prepare("SELECT user_id FROM users WHERE email = ?");
         $stmt->execute([$email]);
         $user = $stmt->fetch();
 
-        if ($user && password_verify($password, $user['password'])) {
-            $_SESSION['user_id'] = $user['user_id'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['role'] = $user['role'];
-            header('Location: ../dashboard.php');
-            exit;
+        if ($user) {
+            $token = bin2hex(random_bytes(32));
+            $expires = date('Y-m-d H:i:s', strtotime('+1 hour'));
+            $stmt = $pdo->prepare("INSERT INTO password_resets (email, token, expires_at) VALUES (?, ?, ?)");
+            $stmt->execute([$email, $token, $expires]);
+
+            $resetLink = "http://{$_SERVER['HTTP_HOST']}/online-exam-system/auth/reset_password.php?token=$token";
+            $success = "Your password reset link is ready. <br> <a href=\"$resetLink\" class=\"fw-bold\">Click here to reset your password</a>";
+            $success .= "<br><small class=\"text-muted\">(In production, this link would be emailed to you.)</small>";
         } else {
-            $error = 'Invalid email or password.';
+            $error = 'No account found with that email address.';
         }
     }
 }
@@ -37,7 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Log In - Online Exam System</title>
+    <title>Forgot Password - Online Exam System</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/css/style.css">
@@ -47,36 +50,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="auth-card card">
             <div class="card-body">
                 <div class="auth-header">
-                    <i class="bi bi-box-arrow-in-right text-primary" style="font-size: 2.5rem;"></i>
-                    <h3>Welcome Back</h3>
-                    <p class="text-muted small">Sign in to your account</p>
+                    <i class="bi bi-shield-lock-fill text-primary" style="font-size: 2.5rem;"></i>
+                    <h3>Forgot Password</h3>
+                    <p class="text-muted small">Enter your email to receive a reset link</p>
                 </div>
 
                 <?php if ($error): ?>
                     <div class="alert alert-danger py-2"><?= htmlspecialchars($error) ?></div>
                 <?php endif; ?>
+                <?php if ($success): ?>
+                    <div class="alert alert-success py-2"><?= $success ?></div>
+                    <div class="text-center mt-3"><a href="login.php" class="btn btn-primary">Back to Log In</a></div>
+                <?php endif; ?>
 
+                <?php if (!$success): ?>
                 <form method="POST" novalidate>
                     <div class="mb-3">
                         <label class="form-label">Email</label>
                         <input type="email" name="email" class="form-control" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>" required>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">Password</label>
-                        <input type="password" name="password" class="form-control" required>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="remember">
-                            <label class="form-check-label small" for="remember">Remember me</label>
-                        </div>
-                        <a href="forgot_password.php" class="small">Forgot Password?</a>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Log In</button>
+                    <button type="submit" class="btn btn-primary w-100">Send Reset Link</button>
                 </form>
                 <p class="text-center text-muted small mt-3 mb-0">
-                    Don't have an account? <a href="register.php">Register here</a>
+                    <a href="login.php">Back to Log In</a>
                 </p>
+                <?php endif; ?>
             </div>
         </div>
     </div>
