@@ -377,6 +377,18 @@ body {
     color: #6c757d;
 }
 
+/* Admin pages extras */
+.card-header {
+    border-bottom-color: #e9ecef;
+}
+
+.table > thead > tr > th {
+    font-size: 0.8rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #6c757d;
+}
+
 /* Mobile */
 @media (max-width: 991.98px) {
     .dash-sidebar {
