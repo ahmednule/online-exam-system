@@ -1,6 +1,47 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 
+$msg = $_GET['msg'] ?? '';
+
+// Handle POST actions
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    try {
+        if ($action === 'add') {
+            $name = trim($_POST['course_name']);
+            $desc = trim($_POST['description'] ?? '');
+            if ($name) {
+                $stmt = $pdo->prepare("INSERT INTO courses (course_name, description) VALUES (?, ?)");
+                $stmt->execute([$name, $desc ?: null]);
+                header('Location: ?page=courses&msg=added');
+                exit;
+            }
+        } elseif ($action === 'edit') {
+            $id = (int)$_POST['course_id'];
+            $name = trim($_POST['course_name']);
+            $desc = trim($_POST['description'] ?? '');
+            if ($id && $name) {
+                $stmt = $pdo->prepare("UPDATE courses SET course_name = ?, description = ? WHERE course_id = ?");
+                $stmt->execute([$name, $desc ?: null, $id]);
+                header('Location: ?page=courses&msg=updated');
+                exit;
+            }
+        } elseif ($action === 'delete') {
+            $id = (int)$_POST['course_id'];
+            if ($id) {
+                $stmt = $pdo->prepare("DELETE FROM courses WHERE course_id = ?");
+                $stmt->execute([$id]);
+                header('Location: ?page=courses&msg=deleted');
+                exit;
+            }
+        }
+    } catch (PDOException $e) {
+        header('Location: ?page=courses&msg=error');
+        exit;
+    }
+}
+
 $courses = $pdo->query("
     SELECT c.*, (SELECT COUNT(*) FROM units WHERE course_id = c.course_id) AS unit_count
     FROM courses c ORDER BY c.course_name
@@ -11,10 +52,20 @@ $courses = $pdo->query("
         <h4 class="mb-1 fw-bold">Courses</h4>
         <p class="text-muted mb-0 small">Manage all courses in the system</p>
     </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#courseModal">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#courseModal" onclick="resetCourseModal()">
         <i class="bi bi-plus-lg"></i> Add Course
     </button>
 </div>
+
+<?php if ($msg === 'added'): ?>
+    <div class="alert alert-success py-2">Course added successfully.</div>
+<?php elseif ($msg === 'updated'): ?>
+    <div class="alert alert-success py-2">Course updated successfully.</div>
+<?php elseif ($msg === 'deleted'): ?>
+    <div class="alert alert-success py-2">Course deleted successfully.</div>
+<?php elseif ($msg === 'error'): ?>
+    <div class="alert alert-danger py-2">An error occurred. Please try again.</div>
+<?php endif; ?>
 
 <div class="card">
     <div class="card-body p-0">
@@ -64,8 +115,9 @@ $courses = $pdo->query("
                 <h5 class="modal-title" id="courseModalTitle">Add Course</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form>
-                <input type="hidden" name="course_id" id="courseId">
+            <form method="POST">
+                <input type="hidden" name="action" id="courseAction" value="add">
+                <input type="hidden" name="course_id" id="courseId" value="0">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Course Name</label>
@@ -89,32 +141,47 @@ $courses = $pdo->query("
 <div class="modal fade" id="deleteCourseModal" tabindex="-1">
     <div class="modal-dialog modal-dialog-centered modal-sm">
         <div class="modal-content">
-            <div class="modal-body text-center py-4">
-                <i class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3 d-block"></i>
-                <h6 class="fw-bold">Delete Course?</h6>
-                <p class="small text-muted mb-0">This will also delete all units and questions under this course. This action cannot be undone.</p>
-                <input type="hidden" id="deleteCourseId">
-            </div>
-            <div class="modal-footer border-0 justify-content-center pt-0">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-danger" onclick="confirmDeleteCourse()">Delete</button>
-            </div>
+            <form method="POST">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="course_id" id="deleteCourseId" value="0">
+                <div class="modal-body text-center py-4">
+                    <i class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3 d-block"></i>
+                    <h6 class="fw-bold">Delete Course?</h6>
+                    <p class="small text-muted mb-0">This will also delete all units and questions under this course. This action cannot be undone.</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
 
 <script>
+var courses = <?= json_encode($courses) ?>;
+
+function resetCourseModal() {
+    document.getElementById('courseAction').value = 'add';
+    document.getElementById('courseModalTitle').textContent = 'Add Course';
+    document.getElementById('courseId').value = 0;
+    document.getElementById('courseName').value = '';
+    document.getElementById('courseDesc').value = '';
+}
+
 function editCourse(id) {
-    // Stub — will populate form via AJAX later
+    var c = courses.find(function(x) { return x.course_id == id; });
+    if (!c) return;
+    document.getElementById('courseAction').value = 'edit';
     document.getElementById('courseModalTitle').textContent = 'Edit Course';
+    document.getElementById('courseId').value = c.course_id;
+    document.getElementById('courseName').value = c.course_name;
+    document.getElementById('courseDesc').value = c.description || '';
     new bootstrap.Modal(document.getElementById('courseModal')).show();
 }
+
 function deleteCourse(id) {
     document.getElementById('deleteCourseId').value = id;
     new bootstrap.Modal(document.getElementById('deleteCourseModal')).show();
-}
-function confirmDeleteCourse() {
-    // Stub — will POST delete later
-    bootstrap.Modal.getInstance(document.getElementById('deleteCourseModal')).hide();
 }
 </script>

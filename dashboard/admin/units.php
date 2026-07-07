@@ -1,6 +1,34 @@
 <?php
 require_once __DIR__ . '/../../config/db.php';
 
+$msg = $_GET['msg'] ?? '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+
+    try {
+        if ($action === 'add') {
+            $stmt = $pdo->prepare("INSERT INTO units (course_id, unit_name, description, duration_minutes) VALUES (?, ?, ?, ?)");
+            $stmt->execute([(int)$_POST['course_id'], trim($_POST['unit_name']), trim($_POST['description'] ?? ''), (int)$_POST['duration_minutes']]);
+            header('Location: ?page=units&msg=added');
+            exit;
+        } elseif ($action === 'edit') {
+            $stmt = $pdo->prepare("UPDATE units SET course_id=?, unit_name=?, description=?, duration_minutes=? WHERE unit_id=?");
+            $stmt->execute([(int)$_POST['course_id'], trim($_POST['unit_name']), trim($_POST['description'] ?? ''), (int)$_POST['duration_minutes'], (int)$_POST['unit_id']]);
+            header('Location: ?page=units&msg=updated');
+            exit;
+        } elseif ($action === 'delete') {
+            $stmt = $pdo->prepare("DELETE FROM units WHERE unit_id = ?");
+            $stmt->execute([(int)$_POST['unit_id']]);
+            header('Location: ?page=units&msg=deleted');
+            exit;
+        }
+    } catch (PDOException $e) {
+        header('Location: ?page=units&msg=error');
+        exit;
+    }
+}
+
 $courses = $pdo->query("SELECT course_id, course_name FROM courses ORDER BY course_name")->fetchAll();
 
 $selected_course = $_GET['course_id'] ?? null;
@@ -8,18 +36,15 @@ if ($selected_course) {
     $stmt = $pdo->prepare("
         SELECT u.*, c.course_name,
             (SELECT COUNT(*) FROM questions WHERE unit_id = u.unit_id) AS question_count
-        FROM units u
-        JOIN courses c ON c.course_id = u.course_id
-        WHERE u.course_id = ?
-        ORDER BY u.unit_name
+        FROM units u JOIN courses c ON c.course_id = u.course_id
+        WHERE u.course_id = ? ORDER BY u.unit_name
     ");
     $stmt->execute([$selected_course]);
 } else {
     $stmt = $pdo->query("
         SELECT u.*, c.course_name,
             (SELECT COUNT(*) FROM questions WHERE unit_id = u.unit_id) AS question_count
-        FROM units u
-        JOIN courses c ON c.course_id = u.course_id
+        FROM units u JOIN courses c ON c.course_id = u.course_id
         ORDER BY c.course_name, u.unit_name
     ");
 }
@@ -30,10 +55,20 @@ $units = $stmt->fetchAll();
         <h4 class="mb-1 fw-bold">Units</h4>
         <p class="text-muted mb-0 small">Manage units/subjects under each course</p>
     </div>
-    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal">
+    <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#unitModal" onclick="resetUnitModal()">
         <i class="bi bi-plus-lg"></i> Add Unit
     </button>
 </div>
+
+<?php if ($msg === 'added'): ?>
+    <div class="alert alert-success py-2">Unit added successfully.</div>
+<?php elseif ($msg === 'updated'): ?>
+    <div class="alert alert-success py-2">Unit updated successfully.</div>
+<?php elseif ($msg === 'deleted'): ?>
+    <div class="alert alert-success py-2">Unit deleted successfully.</div>
+<?php elseif ($msg === 'error'): ?>
+    <div class="alert alert-danger py-2">An error occurred.</div>
+<?php endif; ?>
 
 <div class="card mb-4">
     <div class="card-body py-3">
@@ -45,9 +80,7 @@ $units = $stmt->fetchAll();
                     <select name="course_id" class="form-select form-select-sm" onchange="this.form.submit()">
                         <option value="">All Courses</option>
                         <?php foreach ($courses as $c): ?>
-                            <option value="<?= $c['course_id'] ?>" <?= $selected_course == $c['course_id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($c['course_name']) ?>
-                            </option>
+                            <option value="<?= $c['course_id'] ?>" <?= $selected_course == $c['course_id'] ? 'selected' : '' ?>><?= htmlspecialchars($c['course_name']) ?></option>
                         <?php endforeach; ?>
                     </select>
                 </div>
@@ -87,12 +120,8 @@ $units = $stmt->fetchAll();
                             <td><?= $u['duration_minutes'] ?> min</td>
                             <td><span class="badge bg-info-subtle text-info"><?= $u['question_count'] ?></span></td>
                             <td>
-                                <button class="btn btn-sm btn-outline-primary" title="Edit">
-                                    <i class="bi bi-pencil"></i>
-                                </button>
-                                <button class="btn btn-sm btn-outline-danger" title="Delete">
-                                    <i class="bi bi-trash"></i>
-                                </button>
+                                <button class="btn btn-sm btn-outline-primary" title="Edit" onclick="editUnit(<?= $u['unit_id'] ?>)"><i class="bi bi-pencil"></i></button>
+                                <button class="btn btn-sm btn-outline-danger" title="Delete" onclick="deleteUnit(<?= $u['unit_id'] ?>)"><i class="bi bi-trash"></i></button>
                             </td>
                         </tr>
                         <?php endforeach; ?>
@@ -111,8 +140,9 @@ $units = $stmt->fetchAll();
                 <h5 class="modal-title" id="unitModalTitle">Add Unit</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            <form>
-                <input type="hidden" name="unit_id" id="unitId">
+            <form method="POST">
+                <input type="hidden" name="action" id="unitAction" value="add">
+                <input type="hidden" name="unit_id" id="unitId" value="0">
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">Course</label>
@@ -144,3 +174,56 @@ $units = $stmt->fetchAll();
         </div>
     </div>
 </div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteUnitModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered modal-sm">
+        <div class="modal-content">
+            <form method="POST">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="unit_id" id="deleteUnitId" value="0">
+                <div class="modal-body text-center py-4">
+                    <i class="bi bi-exclamation-triangle-fill text-danger fs-1 mb-3 d-block"></i>
+                    <h6 class="fw-bold">Delete Unit?</h6>
+                    <p class="small text-muted mb-0">This will also delete all questions under this unit.</p>
+                </div>
+                <div class="modal-footer border-0 justify-content-center pt-0">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+var units = <?= json_encode($units) ?>;
+
+function resetUnitModal() {
+    document.getElementById('unitAction').value = 'add';
+    document.getElementById('unitModalTitle').textContent = 'Add Unit';
+    document.getElementById('unitId').value = 0;
+    document.getElementById('unitCourse').value = '';
+    document.getElementById('unitName').value = '';
+    document.getElementById('unitDesc').value = '';
+    document.getElementById('unitDuration').value = 30;
+}
+
+function editUnit(id) {
+    var u = units.find(function(x) { return x.unit_id == id; });
+    if (!u) return;
+    document.getElementById('unitAction').value = 'edit';
+    document.getElementById('unitModalTitle').textContent = 'Edit Unit';
+    document.getElementById('unitId').value = u.unit_id;
+    document.getElementById('unitCourse').value = u.course_id;
+    document.getElementById('unitName').value = u.unit_name;
+    document.getElementById('unitDesc').value = u.description || '';
+    document.getElementById('unitDuration').value = u.duration_minutes;
+    new bootstrap.Modal(document.getElementById('unitModal')).show();
+}
+
+function deleteUnit(id) {
+    document.getElementById('deleteUnitId').value = id;
+    new bootstrap.Modal(document.getElementById('deleteUnitModal')).show();
+}
+</script>

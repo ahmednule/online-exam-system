@@ -77,14 +77,14 @@ $attempts = $stmt->fetchAll();
 
 <!-- View Details Modal -->
 <div class="modal fade" id="viewAttemptModal" tabindex="-1">
-    <div class="modal-dialog modal-lg modal-dialog-centered">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title">Attempt Details</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body" id="attemptDetails">
-                <div class="text-center text-muted py-4">Loading...</div>
+                <div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading...</div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
@@ -96,9 +96,16 @@ $attempts = $stmt->fetchAll();
 <script>
 function viewAttempt(id) {
     var modal = new bootstrap.Modal(document.getElementById('viewAttemptModal'));
-    document.getElementById('attemptDetails').innerHTML = '<div class="text-center text-muted py-4">Loading...</div>';
+    document.getElementById('attemptDetails').innerHTML = '<div class="text-center text-muted py-4"><div class="spinner-border spinner-border-sm me-2" role="status"></div>Loading...</div>';
     modal.show();
-    // Stub — will fetch via AJAX later
-    document.getElementById('attemptDetails').innerHTML = '<p class="text-muted text-center py-3">Detailed answer review will appear here.</p>';
+
+    fetch('attempt_detail.php?attempt_id=' + id)
+        .then(function(r) { return r.text(); })
+        .then(function(html) {
+            document.getElementById('attemptDetails').innerHTML = html;
+        })
+        .catch(function() {
+            document.getElementById('attemptDetails').innerHTML = '<div class="alert alert-danger">Failed to load details.</div>';
+        });
 }
 </script>
