@@ -536,3 +536,38 @@ body {
         right: -1rem;
     }
 }
+
+@media (max-width: 575.98px) {
+    .notif-panel {
+        width: 100%;
+    }
+}
+
+/* ── Student Profile ── */
+.profile-avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 2rem;
+    font-weight: 700;
+}
+
+/* ── Unit Cards ── */
+.unit-card {
+    border: 1px solid #e9ecef;
+    border-radius: 14px;
+    transition: box-shadow 0.2s ease;
+}
+
+.unit-card:hover {
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+}
+
+.unit-card .card-title {
+    font-size: 1rem;
+}
