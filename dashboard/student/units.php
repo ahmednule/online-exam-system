@@ -101,7 +101,7 @@ if ($course) {
                             <span><i class="bi bi-clock"></i> <?= $u['duration_minutes'] ?> min</span>
                             <span><i class="bi bi-question-circle"></i> <?= $u['question_count'] ?> questions</span>
                         </div>
-                        <a href="#" class="btn <?= $btnClass ?> btn-sm w-100">
+                        <a href="exam.php?unit_id=<?= $u['unit_id'] ?>" class="btn <?= $btnClass ?> btn-sm w-100">
                             <?= $btnText ?>
                         </a>
                     </div>

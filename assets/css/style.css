@@ -571,3 +571,29 @@ body {
 .unit-card .card-title {
     font-size: 1rem;
 }
+
+/* ── Exam Page ── */
+.question-card .option-label {
+    cursor: pointer;
+    transition: all 0.12s ease;
+}
+
+.question-card .option-label:hover {
+    background: #f8f9fa;
+}
+
+.question-card .option-label input[type="radio"] {
+    flex-shrink: 0;
+}
+
+.q-nav-btn {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 8px;
+}
